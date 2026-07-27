@@ -105,6 +105,8 @@ function App() {
       particles: [],
       level: 0,
       lastLevel: -1,
+      dying: false,
+      deathTime: 0,
     }
   }, [])
 
@@ -243,105 +245,120 @@ function App() {
       const bg = ACT_BACKGROUNDS[act]
 
       // --- Update ---
-      game.scrollX += difficulty.scrollSpeed
 
-      // Player physics
-      if (!player.isGrounded) {
-        player.vy += GRAVITY
-        player.x += player.vx
-        player.y += player.vy
+      const triggerDeath = () => {
+        if (!game.dying) {
+          game.dying = true
+          game.deathTime = performance.now()
+          if (game.score > highScore) {
+            const newHigh = game.score
+            setHighScore(newHigh)
+            localStorage.setItem('jj_highscore', newHigh.toString())
+          }
+          // Death burst particles
+          for (let i = 0; i < 12; i++) {
+            game.particles.push({
+              x: player.x + player.width / 2,
+              y: player.y + player.height / 2,
+              vx: (Math.random() - 0.5) * 8,
+              vy: (Math.random() - 0.5) * 8,
+              life: 1,
+            })
+          }
+        }
+      }
 
-        player.vx *= 0.99
-
-        if (player.y >= groundY - player.height) {
-          player.y = groundY - player.height
-          player.vy = 0
-          player.vx = 0
-          player.isGrounded = true
-          player.landingTime = performance.now()
-          player.squash = 1
-
-          game.score++
-          setScore(game.score)
+      if (game.dying) {
+        const deathElapsed = performance.now() - game.deathTime
+        if (deathElapsed > 1200) {
+          setScreen('dead')
+          return
         }
       } else {
-        player.x += (120 - player.x) * 0.1
+        game.scrollX += difficulty.scrollSpeed
 
-        if (player.squash > 0) {
-          player.squash *= 0.85
-          if (player.squash < 0.01) player.squash = 0
-        }
+        // Player physics
+        if (!player.isGrounded) {
+          player.vy += GRAVITY
+          player.x += player.vx
+          player.y += player.vy
 
-        if (player.landingTime !== null) {
-          const elapsed = performance.now() - player.landingTime
-          if (elapsed > LANDING_WINDOW) {
-            player.vy = -MIN_JUMP_POWER
+          player.vx *= 0.99
+
+          if (player.y >= groundY - player.height) {
+            player.y = groundY - player.height
+            player.vy = 0
             player.vx = 0
-            player.isGrounded = false
-            player.landingTime = null
+            player.isGrounded = true
+            player.landingTime = performance.now()
+            player.squash = 1
+
+            game.score++
+            setScore(game.score)
+          }
+        } else {
+          player.x += (120 - player.x) * 0.1
+
+          if (player.squash > 0) {
+            player.squash *= 0.85
+            if (player.squash < 0.01) player.squash = 0
+          }
+
+          if (player.landingTime !== null) {
+            const elapsed = performance.now() - player.landingTime
+            if (elapsed > LANDING_WINDOW) {
+              player.vy = -MIN_JUMP_POWER
+              player.vx = 0
+              player.isGrounded = false
+              player.landingTime = null
+            }
           }
         }
-      }
 
-      // Die if scrolled off left
-      if (player.x + player.width < 0) {
-        if (game.score > highScore) {
-          const newHigh = game.score
-          setHighScore(newHigh)
-          localStorage.setItem('jj_highscore', newHigh.toString())
+        // Die if scrolled off left
+        if (player.x + player.width < 0) {
+          triggerDeath()
         }
-        setScreen('dead')
-        return
-      }
 
-      // Spawn obstacles with level-appropriate difficulty
-      while (game.nextObstacleX - game.scrollX < canvas.width + 200) {
-        const gapSize = difficulty.gapMin + Math.random() * (difficulty.gapMax - difficulty.gapMin)
-        const gapY = 100 + Math.random() * (groundY - gapSize - 150)
+        // Spawn obstacles with level-appropriate difficulty
+        while (game.nextObstacleX - game.scrollX < canvas.width + 200) {
+          const gapSize = difficulty.gapMin + Math.random() * (difficulty.gapMax - difficulty.gapMin)
+          const gapY = 100 + Math.random() * (groundY - gapSize - 150)
 
-        obstacles.push({
-          x: game.nextObstacleX,
-          gapY,
-          gapSize,
-          passed: false,
-        })
+          obstacles.push({
+            x: game.nextObstacleX,
+            gapY,
+            gapSize,
+            passed: false,
+          })
 
-        game.nextObstacleX += difficulty.spacingMin + Math.random() * (difficulty.spacingMax - difficulty.spacingMin)
-      }
+          game.nextObstacleX += difficulty.spacingMin + Math.random() * (difficulty.spacingMax - difficulty.spacingMin)
+        }
 
-      // Collision detection
-      const px = player.x
-      const py = player.y
-      const pw = player.width
-      const ph = player.height
+        // Collision detection
+        const px = player.x
+        const py = player.y
+        const pw = player.width
+        const ph = player.height
 
-      for (const obs of obstacles) {
-        const ox = obs.x - game.scrollX
-        if (ox > px + pw || ox + OBSTACLE_WIDTH < px) continue
+        for (const obs of obstacles) {
+          const ox = obs.x - game.scrollX
+          if (ox > px + pw || ox + OBSTACLE_WIDTH < px) continue
 
-        if (py < obs.gapY) {
-          if (game.score > highScore) {
-            const newHigh = game.score
-            setHighScore(newHigh)
-            localStorage.setItem('jj_highscore', newHigh.toString())
+          if (py < obs.gapY) {
+            triggerDeath()
+            break
           }
-          setScreen('dead')
-          return
-        }
-        if (py + ph > obs.gapY + obs.gapSize) {
-          if (game.score > highScore) {
-            const newHigh = game.score
-            setHighScore(newHigh)
-            localStorage.setItem('jj_highscore', newHigh.toString())
+          if (py + ph > obs.gapY + obs.gapSize) {
+            triggerDeath()
+            break
           }
-          setScreen('dead')
-          return
         }
-      }
 
-      // Remove off-screen obstacles
-      while (obstacles.length > 0 && obstacles[0].x - game.scrollX < -OBSTACLE_WIDTH - 50) {
-        obstacles.shift()
+        // Remove off-screen obstacles
+        while (obstacles.length > 0 && obstacles[0].x - game.scrollX < -OBSTACLE_WIDTH - 50) {
+          obstacles.shift()
+        }
       }
 
       // Particles
@@ -434,22 +451,24 @@ function App() {
       }
 
       // Player
-      ctx.save()
-      ctx.translate(player.x + player.width / 2, player.y + player.height)
-      const sq = player.squash
-      ctx.scale(1 + sq * 0.3, 1 - sq * 0.3)
+      if (!game.dying) {
+        ctx.save()
+        ctx.translate(player.x + player.width / 2, player.y + player.height)
+        const sq = player.squash
+        ctx.scale(1 + sq * 0.3, 1 - sq * 0.3)
 
-      ctx.fillStyle = '#FFD600'
-      ctx.fillRect(-player.width / 2, -player.height, player.width, player.height)
+        ctx.fillStyle = '#FFD600'
+        ctx.fillRect(-player.width / 2, -player.height, player.width, player.height)
 
-      ctx.fillStyle = '#000'
-      ctx.fillRect(-player.width / 4 - 2, -player.height + 6, 5, 6)
-      ctx.fillRect(player.width / 4 - 3, -player.height + 6, 5, 6)
+        ctx.fillStyle = '#000'
+        ctx.fillRect(-player.width / 4 - 2, -player.height + 6, 5, 6)
+        ctx.fillRect(player.width / 4 - 3, -player.height + 6, 5, 6)
 
-      ctx.fillStyle = '#E65100'
-      ctx.fillRect(-4, -player.height + 18, 8, 4)
+        ctx.fillStyle = '#E65100'
+        ctx.fillRect(-4, -player.height + 18, 8, 4)
 
-      ctx.restore()
+        ctx.restore()
+      }
 
       // Landing window indicator
       if (player.isGrounded && player.landingTime !== null) {
@@ -488,6 +507,14 @@ function App() {
       ctx.lineWidth = 3
       ctx.strokeText(`ACT ${actNum} - LEVEL ${levelInAct}`, canvas.width / 2, 90)
       ctx.fillText(`ACT ${actNum} - LEVEL ${levelInAct}`, canvas.width / 2, 90)
+
+      // Death fade overlay
+      if (game.dying) {
+        const deathElapsed = performance.now() - game.deathTime
+        const fade = Math.min(deathElapsed / 1200, 1)
+        ctx.fillStyle = `rgba(0, 0, 0, ${fade * 0.7})`
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
 
       animId = requestAnimationFrame(loop)
     }
