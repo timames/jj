@@ -74,6 +74,7 @@ function seededRandom(seed) {
 function App() {
   const canvasRef = useRef(null)
   const gameRef = useRef(null)
+  const tapQueueRef = useRef(0)
   const [screen, setScreen] = useState('menu') // menu | playing | dead
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(() => {
@@ -125,49 +126,7 @@ function App() {
       return
     }
 
-    const game = gameRef.current
-    if (!game) return
-    const player = game.player
-
-    if (player.isGrounded && player.landingTime !== null) {
-      const elapsed = performance.now() - player.landingTime
-      const timing = Math.min(elapsed / LANDING_WINDOW, 1)
-
-      const power = MAX_JUMP_POWER - timing * (MAX_JUMP_POWER - MIN_JUMP_POWER)
-      const angleDeg = MAX_JUMP_ANGLE - timing * (MAX_JUMP_ANGLE - MIN_JUMP_ANGLE)
-      const angleRad = (angleDeg * Math.PI) / 180
-
-      player.vy = -Math.sin(angleRad) * power
-      player.vx = 0
-      player.isGrounded = false
-      player.landingTime = null
-      player.squash = 0
-      player.airJumpsLeft = MAX_AIR_JUMPS
-
-      for (let i = 0; i < 6; i++) {
-        game.particles.push({
-          x: player.x + player.width / 2,
-          y: game.groundY,
-          vx: (Math.random() - 0.5) * 3,
-          vy: -Math.random() * 4,
-          life: 1,
-        })
-      }
-    } else if (!player.isGrounded && player.airJumpsLeft > 0) {
-      player.vy = -DOUBLE_JUMP_POWER
-      player.vx = 0
-      player.airJumpsLeft--
-
-      for (let i = 0; i < 4; i++) {
-        game.particles.push({
-          x: player.x + player.width / 2,
-          y: player.y + player.height,
-          vx: (Math.random() - 0.5) * 4,
-          vy: Math.random() * 3,
-          life: 0.8,
-        })
-      }
-    }
+    tapQueueRef.current++
   }, [screen, initGame])
 
   useEffect(() => {
@@ -275,6 +234,51 @@ function App() {
           return
         }
       } else {
+        // Process buffered tap inputs
+        while (tapQueueRef.current > 0) {
+          tapQueueRef.current--
+
+          if (player.isGrounded && player.landingTime !== null) {
+            const elapsed = performance.now() - player.landingTime
+            const timing = Math.min(elapsed / LANDING_WINDOW, 1)
+
+            const power = MAX_JUMP_POWER - timing * (MAX_JUMP_POWER - MIN_JUMP_POWER)
+            const angleDeg = MAX_JUMP_ANGLE - timing * (MAX_JUMP_ANGLE - MIN_JUMP_ANGLE)
+            const angleRad = (angleDeg * Math.PI) / 180
+
+            player.vy = -Math.sin(angleRad) * power
+            player.vx = 0
+            player.isGrounded = false
+            player.landingTime = null
+            player.squash = 0
+            player.airJumpsLeft = MAX_AIR_JUMPS
+
+            for (let i = 0; i < 6; i++) {
+              game.particles.push({
+                x: player.x + player.width / 2,
+                y: game.groundY,
+                vx: (Math.random() - 0.5) * 3,
+                vy: -Math.random() * 4,
+                life: 1,
+              })
+            }
+          } else if (!player.isGrounded && player.airJumpsLeft > 0) {
+            player.vy = -DOUBLE_JUMP_POWER
+            player.vx = 0
+            player.airJumpsLeft--
+
+            for (let i = 0; i < 4; i++) {
+              game.particles.push({
+                x: player.x + player.width / 2,
+                y: player.y + player.height,
+                vx: (Math.random() - 0.5) * 4,
+                vy: Math.random() * 3,
+                life: 0.8,
+              })
+            }
+          }
+        }
+
         game.scrollX += difficulty.scrollSpeed
 
         // Player physics
