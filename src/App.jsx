@@ -52,13 +52,12 @@ function getCrystalColor(level) {
 // Difficulty scales with act
 function getLevelDifficulty(level) {
   const act = getAct(level)
-  const t = act / 2 // 0, 0.5, 1
   return {
     gapMin: 220 - act * 20,
     gapMax: 320 - act * 30,
     spacingMin: 300 - act * 30,
     spacingMax: 500 - act * 50,
-    scrollSpeed: BASE_SCROLL_SPEED + act * 0.3,
+    scrollSpeed: BASE_SCROLL_SPEED * Math.pow(1.01, level),
   }
 }
 
@@ -204,7 +203,6 @@ function App() {
       const bg = ACT_BACKGROUNDS[act]
 
       // --- Update ---
-
       const triggerDeath = () => {
         if (!game.dying) {
           game.dying = true
