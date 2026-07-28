@@ -437,7 +437,10 @@ function App() {
 
         while (game.nextObstacleX - game.scrollX < canvas.width + 200) {
           const gapSize = difficulty.gapMin + Math.random() * (difficulty.gapMax - difficulty.gapMin)
-          const gapY = 100 + Math.random() * (groundY - gapSize - 150)
+          const maxBottomColumn = 120
+          const minGapY = groundY - gapSize - maxBottomColumn
+          const maxGapY = groundY - gapSize - 20
+          const gapY = minGapY + Math.random() * Math.max(maxGapY - minGapY, 0)
           obstacles.push({ x: game.nextObstacleX, gapY, gapSize, passed: false })
           game.nextObstacleX += difficulty.spacingMin + Math.random() * (difficulty.spacingMax - difficulty.spacingMin)
         }
